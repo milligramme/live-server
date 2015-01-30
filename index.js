@@ -78,7 +78,7 @@ LiveServer.start = function(port, directory, suppressBrowserLaunch) {
 		.use(staticServer(directory)) // Custom static server
 		.use(connect.directory(directory, { icons: true }))
 		.use(connect.logger('dev'));
-	var server = http.createServer(app).listen(port, '0.0.0.0');
+	var server = http.createServer(app).listen(port, '127.0.0.1');
 	// WebSocket
 	server.addListener('upgrade', function(request, socket, head) {
 		ws = new WebSocket(request, socket, head);
@@ -108,11 +108,11 @@ LiveServer.start = function(port, directory, suppressBrowserLaunch) {
 		}
 	});
 	// Output
-	console.log(('Serving "' + directory + '" at http://0.0.0.0:' + port).green);
+	console.log(('Serving "' + directory + '" at http://127.0.0.1:' + port).green);
 
 	// Launch browser
 	if(!suppressBrowserLaunch)
-		open('http://0.0.0.0:' + port);
+		open('http://127.0.0.1:' + port);
 }
 
 module.exports = LiveServer;
