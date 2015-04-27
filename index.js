@@ -1,5 +1,6 @@
 #!/usr/bin/env node
-var connect = require('connect'),
+var fs = require('fs'),
+	connect = require('connect'),
 	colors = require('colors'),
 	WebSocket = require('faye-websocket'),
 	path = require('path'),
@@ -11,7 +12,7 @@ var connect = require('connect'),
 	watchr = require('watchr'),
 	ws;
 
-var INJECTED_CODE = require('fs').readFileSync(__dirname + "/injected.html", "utf8");
+var INJECTED_CODE = fs.readFileSync(__dirname + "/injected.html", "utf8");
 
 var LiveServer = {};
 
@@ -28,6 +29,8 @@ function staticServer(root) {
 	return function(req, res, next) {
 		if ('GET' != req.method && 'HEAD' != req.method) return next();
 		var reqpath = url.parse(req.url).pathname;
+		var hasNoOrigin = !req.headers.origin;
+		var doInject = false;
 
 		function directory() {
 			var pathname = url.parse(req.originalUrl).pathname;
@@ -36,18 +39,25 @@ function staticServer(root) {
 			res.end('Redirecting to ' + escape(pathname) + '/');
 		}
 
+		function file(filepath, stat) {
+			var x = path.extname(filepath);
+			if (hasNoOrigin && (x === "" || x == ".html" || x == ".htm" || x == ".xhtml" || x == ".php")) {
+				// TODO: Sync file read here is not nice, but we need to determine if the html should be injected or not
+				var contents = fs.readFileSync(filepath, "utf8");
+				doInject = contents.indexOf("</body>") > -1;
+			}
+		}
+
 		function error(err) {
 			if (404 == err.status) return next();
 			next(err);
 		}
 
 		function inject(stream) {
-			var x = path.extname(reqpath);
-			if (x === "" || x == ".html" || x == ".htm" || x == ".xhtml" || x == ".php") {
+			if (doInject) {
 				// We need to modify the length given to browser
 				var len = INJECTED_CODE.length + res.getHeader('Content-Length');
 				res.setHeader('Content-Length', len);
-
 				var originalPipe = stream.pipe;
 				stream.pipe = function(res) {
 					originalPipe.call(stream, es.replace(new RegExp("</body>","i"), INJECTED_CODE + "</body>")).pipe(res);
@@ -57,28 +67,38 @@ function staticServer(root) {
 
 		send(req, reqpath, { root: root })
 			.on('error', error)
-			.on('stream', inject)
 			.on('directory', directory)
+			.on('file', file)
+			.on('stream', inject)
 			.pipe(res);
 	};
 }
 
 /**
- * Start a live server at the given port and directory
- * @param port {number} Port number (default 8080)
- * @param directory {string} Path to root directory (default to cwd)
- * @param suppressBrowserLaunch
+ * Start a live server with parameters given as an object
+ * @param host {string} Address to bind to (default: 0.0.0.0)
+ * @param port {number} Port number (default: 8080)
+ * @param root {string} Path to root directory (default: cwd)
+ * @param open {string} Subpath to open in browser, use false to suppress launch (default: server root)
+ * @param logLevel {number} 0 = errors only, 1 = some, 2 = lots
  */
-LiveServer.start = function(port, directory, suppressBrowserLaunch) {
-	port = port || 8080;
-	directory = directory || process.cwd();
+LiveServer.start = function(options) {
+	options = options || {};
+	var host = options.host || '0.0.0.0';
+	var port = options.port || 8080;
+	var root = options.root || process.cwd();
+	var logLevel = options.logLevel === undefined ? 2 : options.logLevel;
+	var openPath = (options.open === undefined || options.open === true) ?
+		"" : ((options.open === null || options.open === false) ? null : options.open);
+	if (options.noBrowser) openPath = null; // Backwards compatibility with 0.7.0
 
 	// Setup a web server
 	var app = connect()
-		.use(staticServer(directory)) // Custom static server
-		.use(connect.directory(directory, { icons: true }))
-		.use(connect.logger('dev'));
-	var server = http.createServer(app).listen(port, '127.0.0.1');
+		.use(staticServer(root)) // Custom static server
+		.use(connect.directory(root, { icons: true }));
+	if (logLevel >= 2)
+		app.use(connect.logger('dev'));
+	var server = http.createServer(app).listen(port, host);
 	// WebSocket
 	server.addListener('upgrade', function(request, socket, head) {
 		ws = new WebSocket(request, socket, head);
@@ -86,33 +106,37 @@ LiveServer.start = function(port, directory, suppressBrowserLaunch) {
 	});
 	// Setup file watcher
 	watchr.watch({
-		path: directory,
+		path: root,
 		ignoreCommonPatterns: true,
 		ignoreHiddenFiles: true,
 		preferredMethods: [ 'watchFile', 'watch' ],
 		interval: 1407,
 		listeners: {
 			error: function(err) {
-				console.log("ERROR:".red , err)
+				console.log("ERROR:".red , err);
 			},
 			change: function(eventName, filePath, fileCurrentStat, filePreviousStat) {
 				if (!ws) return;
 				if (path.extname(filePath) == ".css") {
 					ws.send('refreshcss');
-					console.log("CSS change detected".magenta);
+					if (logLevel >= 1)
+						console.log("CSS change detected".magenta);
 				} else {
 					ws.send('reload');
-					console.log("File change detected".cyan);
+					if (logLevel >= 1)
+						console.log("File change detected".cyan);
 				}
 			}
 		}
 	});
 	// Output
-	console.log(('Serving "' + directory + '" at http://127.0.0.1:' + port).green);
+	var serveURL = "http://127.0.0.1:" + port;
+	if (logLevel >= 1)
+		console.log(('Serving "' + root + '" at ' + serveURL).green);
 
 	// Launch browser
-	if(!suppressBrowserLaunch)
-		open('http://127.0.0.1:' + port);
-}
+	if (openPath !== null)
+		open(serveURL + openPath);
+};
 
 module.exports = LiveServer;

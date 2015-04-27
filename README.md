@@ -42,6 +42,12 @@ This will automatically launch the default browser (you should have `index.html`
 
 You can configure the port to be used by the server by adding the `--port=<number>` runtime option when invoking live-server, or by setting the `PORT` environment variable prior to running live-server.
 
+Additional parameters:
+
+* `--no-browser` - suppress automatic web browser launching
+* `--quiet` - suppress logging
+* `--open=PATH` - launch browser to PATH instead of server root
+
 
 Usage from node
 ---------------
@@ -49,10 +55,13 @@ Usage from node
 ```javascript
 var liveServer = require("live-server");
 
-var port = 8181; // Set the server port. Defaults to 8080.
-var dir = "/public"; // Set root of directory that's being server. Defaults to cwd.
-var suppressBrowserLaunch = true; // When true, it won't load your browser by default.
-liveServer.start(port, dir, suppressBrowserLaunch);
+var params = {
+	port: 8181, // Set the server port. Defaults to 8080.
+	host: "0.0.0.0", // Set the address to bind to. Defaults to 0.0.0.0.
+	root: "/public", // Set root directory that's being server. Defaults to cwd.
+	open: false // When false, it won't load your browser by default.
+};
+liveServer.start(params);
 ```
 
 
@@ -71,7 +80,20 @@ The server is a simple node app that serves the working directory and its subdir
 Version history
 ---------------
 
-* master (unreleased)
+* v0.7.1
+	- Fix hang caused by trying to inject into fragment html files without `</body>`
+	- `logLevel` parameter in library to control amount of console spam
+	- `--quiet` cli option to suppress console spam
+	- `--open=PATH` cli option to launch browser in specified path instead of root (@richardgoater)
+	- Library's `noBrowser: true` option is deprecated in favor of `open: false`
+* v0.7.0
+	- API BREAKAGE: LiveServer library now takes parameters in an object
+	- Added possibility to specify host to the lib
+	- Only inject to host page when working with web components (e.g. Polymer) (@davej)
+	- Open browser to 127.0.0.1, as 0.0.0.0 has issues
+	- `--no-browser` command line flag to suppress browser launch
+	- `--help` command line flag to display usage
+* v0.6.4
 	- Allow specifying port from the command line: `live-server --port=3000` (@Pomax)
 	- Don't inject script as the first thing so that DOCTYPE remains valid (@wmira)
 	- Be more explicit with listening to all interfaces (@inadarei)
