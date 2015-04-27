@@ -84,7 +84,7 @@ function staticServer(root) {
  */
 LiveServer.start = function(options) {
 	options = options || {};
-	var host = options.host || '0.0.0.0';
+	var host = options.host || '127.0.0.1';
 	var port = options.port || 8080;
 	var root = options.root || process.cwd();
 	var logLevel = options.logLevel === undefined ? 2 : options.logLevel;
