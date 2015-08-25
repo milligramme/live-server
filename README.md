@@ -40,13 +40,22 @@ Issue the command `live-server` in your project's directory. Alternatively you c
 
 This will automatically launch the default browser (you should have `index.html` present). When you make a change to any file, the browser will reload the page - unless it was a CSS file in which case the changes are applied without a reload.
 
-You can configure the port to be used by the server by adding the `--port=<number>` runtime option when invoking live-server, or by setting the `PORT` environment variable prior to running live-server.
+Command line parameters:
 
-Additional parameters:
-
+* `--port=NUMBER` - select port to use (can also be done with PORT environment variable)
+* `--host=ADDRESS` - select host address to bind to, default: 0.0.0.0 ("any address")
 * `--no-browser` - suppress automatic web browser launching
 * `--quiet` - suppress logging
 * `--open=PATH` - launch browser to PATH instead of server root
+* `--ignore=PATH` - comma-separated string of paths to ignore
+* `--entry-file=PATH` - serve this file in place of missing files (useful for single page apps)
+* `--wait=MILLISECONDS` - wait for all changes, before reloading
+* `--help | -h` - display terse usage hint and exit
+* `--version | -v` - display version and exit
+
+Default options:
+
+If a file `~/.live-server.json` exists it will be loaded and used as default options for live-server on the command line. See "Usage from node" for option names.
 
 
 Usage from node
@@ -59,7 +68,10 @@ var params = {
 	port: 8181, // Set the server port. Defaults to 8080.
 	host: "0.0.0.0", // Set the address to bind to. Defaults to 0.0.0.0.
 	root: "/public", // Set root directory that's being server. Defaults to cwd.
-	open: false // When false, it won't load your browser by default.
+	open: false, // When false, it won't load your browser by default.
+	ignore: 'scss,my/templates', // comma-separated string for paths to ignore
+	file: "index.html", // When set, serve this file for every 404 (useful for single-page applications)
+	wait: 1000 // Waits for all changes, before reloading. Defaults to 0 sec.
 };
 liveServer.start(params);
 ```
@@ -68,7 +80,7 @@ liveServer.start(params);
 Troubleshooting
 ---------------
 
-Open your browser's console: there should be a message at the top stating that live reload is enabled. If there are errors, deal with them. You will need a browser that supports WebSockets.
+Open your browser's console: there should be a message at the top stating that live reload is enabled. Note that you will need a browser that supports WebSockets. If there are errors, deal with them. If it's still not working, [file an issue](https://github.com/tapio/live-server/issues).
 
 
 How it works
@@ -77,9 +89,28 @@ How it works
 The server is a simple node app that serves the working directory and its subdirectories. It also watches the files for changes and when that happens, it sends a message through a web socket connection to the browser instructing it to reload. In order for the client side to support this, the server injects a small piece of JavaScript code to each requested html file. This script establishes the web socket connection and listens to the reload requests.
 
 
+Contributing
+------------
+
+We welcome contributions! See [CONTRIBUTING.md](CONTRIBUTING.md) for details.
+
+
 Version history
 ---------------
 
+* master (unreleased)
+	- Switched to a more maintained browser opening library
+* v0.8.1
+	- Add `--version / -v` command line flags to display version
+	- Add `--host` cli option to mirror the API parameter
+	- Once again use 127.0.0.1 instead of 0.0.0.0 as the browser URL
+* v0.8.0
+	- Support multiple clients simultaneously (@dvv)
+	- Pick a random available port if the default is in use (@oliverzy, @harrytruong)
+	- Fix Chrome sometimes not applying CSS changes (@harrytruong)
+	- `--ignore=PATH` cli option to not watch given server root relative paths (@richardgoater)
+	- `--entry-file=PATH` cli option to specify file to use when request is not found (@izeau)
+	- `--wait=MSECS` cli option to wait specified time before reloading (@leolower, @harrytruong)
 * v0.7.1
 	- Fix hang caused by trying to inject into fragment html files without `</body>`
 	- `logLevel` parameter in library to control amount of console spam
@@ -88,7 +119,7 @@ Version history
 	- Library's `noBrowser: true` option is deprecated in favor of `open: false`
 * v0.7.0
 	- API BREAKAGE: LiveServer library now takes parameters in an object
-	- Added possibility to specify host to the lib
+	- Add possibility to specify host to the lib
 	- Only inject to host page when working with web components (e.g. Polymer) (@davej)
 	- Open browser to 127.0.0.1, as 0.0.0.0 has issues
 	- `--no-browser` command line flag to suppress browser launch
